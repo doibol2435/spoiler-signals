@@ -1,12 +1,13 @@
 import time
 import subprocess
+from datetime import datetime
 
-def run_every(minutes):
+def run_every(minutes=5):
     while True:
-        print("▶ Đang kiểm tra tín hiệu 400 coin...")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"🟢 [{now}] Đang quét tín hiệu mới...")
         subprocess.call(["python", "scan_all.py"])
-        print(f"⏳ Đợi {minutes} phút...")
         time.sleep(minutes * 60)
 
 if __name__ == "__main__":
-    run_every(5)  # kiểm tra mỗi 5 phút
+    run_every(5)  # quét mỗi 5 phút
