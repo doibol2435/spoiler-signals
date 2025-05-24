@@ -26,6 +26,7 @@ def log(message):
         f.write(full + "\n")
 
 def run_every(minutes=5):
+    log("🚀 Bắt đầu worker auto_run.py")
     while True:
         try:
             log("🔄 Đang chạy scan_all.py ...")
