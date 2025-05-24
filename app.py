@@ -1,5 +1,5 @@
 from flask import Flask, render_template, jsonify, request
-from data_collector import get_binance_klines, get_top_usdt_symbols, get_recent_closes
+from data_collector import get_bitget_klines as get_binance_klines, get_top_usdt_symbols, get_recent_closes, get_price_change
 from spoiler_signals import analyze_signals, calculate_signal_score
 import plotly.graph_objs as go
 import plotly
@@ -34,7 +34,10 @@ def stats_page():
 
 @app.route('/api/signal')
 def get_signal():
-    df = get_binance_klines()
+    df = get_binance_klines(symbol='BTCUSDT')  # Sửa lỗi: đảm bảo có volume
+    if df.empty or 'volume' not in df.columns:
+        return jsonify({'signal': '❌ Không có dữ liệu', 'chart': {}})
+
     df_signals = analyze_signals(df)
     latest = df_signals.iloc[-1]
     signal = latest['signal_label'] if pd.notna(latest['signal_label']) else 'None'
@@ -97,6 +100,7 @@ def get_sparkline(symbol):
 @app.route('/api/detail_chart/<symbol>')
 def detail_chart(symbol):
     df = get_binance_klines(symbol)
+    if df.empty: return jsonify({})
     df_signals = analyze_signals(df)
     markers = df_signals[df_signals['signal_label'].notna()]
     candle = go.Candlestick(
@@ -113,7 +117,7 @@ def detail_chart(symbol):
 
 @app.route('/api/ranking_data')
 def get_ranking_data():
-    symbols = get_top_usdt_symbols(limit=300)
+    symbols = get_top_usdt_symbols(limit=100)
     near_breakout = []
     top_gainers = []
 
@@ -123,7 +127,7 @@ def get_ranking_data():
             df_signal = analyze_signals(df)
             latest = df_signal.iloc[-1]
             change = get_price_change(symbol)
-            if latest['near_breakout']:
+            if latest.get('near_breakout', False):
                 near_breakout.append({
                     "symbol": symbol,
                     "osc": round(latest['osc'], 2),
@@ -136,26 +140,6 @@ def get_ranking_data():
 
     top_gainers_sorted = sorted(top_gainers, key=lambda x: x['change'], reverse=True)[:10]
     return jsonify({"breakouts": near_breakout, "gainers": top_gainers_sorted})
-
-@app.route('/api/pnl_status')
-def get_pnl_status():
-    if not os.path.exists("pnl.log"):
-        return jsonify([])
-    with open("pnl.log", encoding="utf-8") as f:
-        lines = f.readlines()
-
-    data = []
-    for line in lines[-200:][::-1]:
-        parts = line.strip().split(",")
-        if len(parts) == 4:
-            symbol, time, result, price = parts
-            data.append({
-                "symbol": symbol,
-                "time": time,
-                "result": result,
-                "price": float(price)
-            })
-    return jsonify(data)
 
 @app.route('/api/pnl_stats')
 def pnl_stats():
@@ -183,15 +167,6 @@ def pnl_stats():
     data = [{"date": k, "pnl": v} for k, v in sorted(pnl_by_date.items())]
     return jsonify({"win": win, "loss": loss, "total": win + loss, "by_date": data})
 
-def get_price_change(symbol):
-    try:
-        url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
-        data = requests.get(url).json()
-        return float(data['priceChangePercent'])
-    except:
-        return 0
-
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
