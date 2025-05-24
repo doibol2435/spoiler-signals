@@ -34,7 +34,7 @@ def stats_page():
 
 @app.route('/api/signal')
 def get_signal():
-    df = get_binance_klines(symbol='BTCUSDT')  # Sửa lỗi: đảm bảo có volume
+    df = get_binance_klines(symbol='BTCUSDT')
     if df.empty or 'volume' not in df.columns:
         return jsonify({'signal': '❌ Không có dữ liệu', 'chart': {}})
 
@@ -100,20 +100,25 @@ def get_sparkline(symbol):
 @app.route('/api/detail_chart/<symbol>')
 def detail_chart(symbol):
     df = get_binance_klines(symbol)
-    if df.empty: return jsonify({})
-    df_signals = analyze_signals(df)
-    markers = df_signals[df_signals['signal_label'].notna()]
-    candle = go.Candlestick(
-        x=df.index,
-        open=df['open'], high=df['high'],
-        low=df['low'], close=df['close'], name="Candles")
-    signal_marks = go.Scatter(
-        x=markers.index, y=markers['close'], mode="markers+text",
-        text=markers['signal_label'], textposition="top center",
-        marker=dict(size=10, color='red'), name="Signals")
-    layout = go.Layout(title=f"{symbol} Chart")
-    fig = go.Figure(data=[candle, signal_marks], layout=layout)
-    return jsonify(json.loads(json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)))
+    if df.empty or 'volume' not in df.columns:
+        return jsonify({'error': 'Không có dữ liệu hoặc symbol không hợp lệ'})
+
+    try:
+        df_signals = analyze_signals(df)
+        markers = df_signals[df_signals['signal_label'].notna()]
+        candle = go.Candlestick(
+            x=df.index,
+            open=df['open'], high=df['high'],
+            low=df['low'], close=df['close'], name="Candles")
+        signal_marks = go.Scatter(
+            x=markers.index, y=markers['close'], mode="markers+text",
+            text=markers['signal_label'], textposition="top center",
+            marker=dict(size=10, color='red'), name="Signals")
+        layout = go.Layout(title=f"{symbol} Chart")
+        fig = go.Figure(data=[candle, signal_marks], layout=layout)
+        return jsonify(json.loads(json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)))
+    except Exception as e:
+        return jsonify({'error': f'Xử lý lỗi: {str(e)}'})
 
 @app.route('/api/ranking_data')
 def get_ranking_data():
@@ -124,6 +129,8 @@ def get_ranking_data():
     for symbol in symbols:
         try:
             df = get_binance_klines(symbol)
+            if df.empty or 'volume' not in df.columns:
+                continue
             df_signal = analyze_signals(df)
             latest = df_signal.iloc[-1]
             change = get_price_change(symbol)
