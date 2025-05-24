@@ -32,6 +32,17 @@ def ranking_page():
 def stats_page():
     return render_template("stats.html")
 
+@app.route('/logs')
+def logs_page():
+    logs = {}
+    for log_file in ["signals.log", "pnl.log", "auto_check.log", "auto_run.log"]:
+        if os.path.exists(log_file):
+            with open(log_file, encoding="utf-8") as f:
+                logs[log_file] = f.read().splitlines()[-100:]  # chỉ lấy 100 dòng cuối
+        else:
+            logs[log_file] = ["(Không tìm thấy file)"]
+    return render_template("logs.html", logs=logs)
+
 @app.route('/api/signal')
 def get_signal():
     df = get_binance_klines(symbol='BTCUSDT')
