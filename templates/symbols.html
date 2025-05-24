@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>🔧 Quản lý Symbol - Coingecko Map</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    .small-text { font-size: 0.9em; color: gray; }
+    pre { max-height: 500px; overflow-y: auto; }
+  </style>
+</head>
+<body class="container py-4">
+  <h2 class="mb-3">🗂 Danh sách symbol ánh xạ từ Coingecko</h2>
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <form id="refreshForm" method="post" action="/admin/refresh_symbols">
+      <button class="btn btn-primary" type="submit">🔄 Làm mới từ Coingecko</button>
+    </form>
+    <span class="small-text">Tự động làm mới mỗi 24 giờ. Bạn có thể cập nhật thủ công ở đây.</span>
+  </div>
+
+  <pre class="border rounded p-3 bg-light">
+{% for symbol, coin_id in symbol_map.items() %}
+{{ symbol }} → {{ coin_id }}
+{% endfor %}
+  </pre>
+
+  <script>
+    const form = document.getElementById("refreshForm");
+    form.addEventListener("submit", function(e) {
+      e.preventDefault();
+      fetch("/admin/refresh_symbols", { method: "POST" })
+        .then(res => res.json())
+        .then(data => {
+          alert(data.message);
+          location.reload();
+        });
+    });
+  </script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 from flask import Flask, render_template, jsonify, request
-from data_collector import get_bitget_klines as get_binance_klines, get_top_usdt_symbols, get_recent_closes, get_price_change
+from data_collector import get_coingecko_klines, get_top_usdt_symbols, get_recent_closes, get_price_change, update_symbol_map
 from spoiler_signals import analyze_signals, calculate_signal_score
 import plotly.graph_objs as go
 import plotly
@@ -38,14 +38,29 @@ def logs_page():
     for log_file in ["signals.log", "pnl.log", "auto_check.log", "auto_run.log"]:
         if os.path.exists(log_file):
             with open(log_file, encoding="utf-8") as f:
-                logs[log_file] = f.read().splitlines()[-100:]  # chỉ lấy 100 dòng cuối
+                logs[log_file] = f.read().splitlines()[-100:]
         else:
             logs[log_file] = ["(Không tìm thấy file)"]
     return render_template("logs.html", logs=logs)
 
+@app.route('/admin/symbols')
+def show_symbol_map():
+    try:
+        with open("symbol_map.json", encoding="utf-8") as f:
+            symbol_map = json.load(f)
+        sorted_map = dict(sorted(symbol_map.items()))
+        return render_template("symbols.html", symbol_map=sorted_map)
+    except:
+        return "Không tìm thấy symbol_map.json hoặc lỗi đọc file."
+
+@app.route('/admin/refresh_symbols', methods=['POST'])
+def refresh_symbol_map():
+    update_symbol_map()
+    return jsonify({"status": "ok", "message": "Đã làm mới symbol_map từ Coingecko."})
+
 @app.route('/api/signal')
 def get_signal():
-    df = get_binance_klines(symbol='BTCUSDT')
+    df = get_coingecko_klines(symbol='BTCUSDT')
     if df.empty or 'volume' not in df.columns:
         return jsonify({'signal': '❌ Không có dữ liệu', 'chart': {}})
 
@@ -110,7 +125,7 @@ def get_sparkline(symbol):
 
 @app.route('/api/detail_chart/<symbol>')
 def detail_chart(symbol):
-    df = get_binance_klines(symbol)
+    df = get_coingecko_klines(symbol)
     if df.empty or 'volume' not in df.columns:
         return jsonify({'error': 'Không có dữ liệu hoặc symbol không hợp lệ'})
 
@@ -139,7 +154,7 @@ def get_ranking_data():
 
     for symbol in symbols:
         try:
-            df = get_binance_klines(symbol)
+            df = get_coingecko_klines(symbol)
             if df.empty or 'volume' not in df.columns:
                 continue
             df_signal = analyze_signals(df)
