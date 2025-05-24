@@ -1,81 +1,72 @@
-from data_collector import get_binance_klines, get_top_usdt_symbols
+from data_collector import get_coingecko_klines as get_klines, get_top_usdt_symbols
 from spoiler_signals import analyze_signals, calculate_signal_score
-import time
+from datetime import datetime
 import os
 import requests
 from dotenv import load_dotenv
-from datetime import datetime
-import pytz
 
-# Load .env
 load_dotenv()
 
+LOG_FILE = "signals.log"
+SENT_FILE = "sent_signals.txt"
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
-LOG_FILE = "signals.log"
-TIMEZONE = pytz.timezone("Asia/Ho_Chi_Minh")  # UTC+7
 
-def send_telegram_message(msg):
+def send_telegram(message):
     if not BOT_TOKEN or not CHAT_ID:
-        print("❌ Thiếu BOT_TOKEN hoặc CHAT_ID trong .env")
         return
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
+    try:
+        requests.post(url, data={"chat_id": CHAT_ID, "text": message, "parse_mode": "Markdown"})
+    except Exception as e:
+        print(f"❌ Lỗi gửi Telegram: {e}")
+
+def save_signal(symbol, signal_type, entry, tp1, tp2, sl, score):
+    time_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    line = f"{symbol},{signal_type},{time_str},{entry},{tp1},{tp2},{sl},{score}"
+    print("🟢", line)
+
+    # Lưu vào log chính
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(line + "\n")
+
+    # Gửi Telegram nếu chưa gửi
+    if os.path.exists(SENT_FILE):
+        with open(SENT_FILE, encoding="utf-8") as f:
+            sent_lines = set(f.read().splitlines())
+    else:
+        sent_lines = set()
+
+    if line not in sent_lines:
+        msg = (
+            f"🚨 *Tín hiệu mới: {symbol}*\n"
+            f"Loại: `{signal_type}`\n"
+            f"Entry: `{entry}`\nTP1: `{tp1}` | TP2: `{tp2}`\nSL: `{sl}`"
+        )
+        send_telegram(msg)
+        with open(SENT_FILE, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
 
 def scan_top_100_and_log():
-    symbols = get_top_usdt_symbols(limit=400)
-    results = []
-    seen = set()
-
+    symbols = get_top_usdt_symbols(limit=100)
     for symbol in symbols:
-        try:
-            df = get_binance_klines(symbol=symbol)
-            df_signal = analyze_signals(df)
-            latest = df_signal.iloc[-1]
-            signal = latest['signal_label']
-            if signal and signal != 'None' and str(signal) != 'nan':
-                now = datetime.now(TIMEZONE)
-                timestamp = now.strftime('%Y-%m-%d %H:%M')
-                day_key = f"{symbol}_{signal}_{now.date()}"
-                if day_key in seen:
-                    continue
+        df = get_klines(symbol)
+        if df.empty or 'volume' not in df.columns:
+            continue
 
-                entry = round(latest['close'], 4)
-                if 'Long' in signal or 'Buy' in signal:
-                    tp1 = round(entry * 1.02, 4)
-                    tp2 = round(entry * 1.04, 4)
-                    sl = round(entry * 0.985, 4)
-                else:
-                    tp1 = round(entry * 0.98, 4)
-                    tp2 = round(entry * 0.96, 4)
-                    sl = round(entry * 1.015, 4)
+        df_signal = analyze_signals(df)
+        latest = df_signal.iloc[-1]
+        label = latest.get("signal_label")
+        if not label or label == 'nan':
+            continue
 
-                score = calculate_signal_score(df_signal)
-                if score < 6:
-                    continue
+        entry = round(float(latest["close"]), 6)
+        sl = round(float(latest["low"] if "Sell" in label else latest["high"]), 6)
+        tp1 = round(entry * 1.01 if "Buy" in label or "Long" in label else entry * 0.99, 6)
+        tp2 = round(entry * 1.02 if "Buy" in label or "Long" in label else entry * 0.98, 6)
+        score = calculate_signal_score(df_signal)
 
-                results.append((symbol, signal, timestamp, entry, tp1, tp2, sl, score))
+        save_signal(symbol, label, entry, tp1, tp2, sl, score)
 
-                with open(LOG_FILE, "a", encoding="utf-8") as f:
-                    f.write(f"{symbol},{signal},{timestamp},{entry},{tp1},{tp2},{sl},{score}\n")
-
-                print(f"✅ {symbol} ➜ {signal} ({timestamp}) | Entry: {entry} | TP1: {tp1} | SL: {sl} | Score: {score}")
-                seen.add(day_key)
-
-        except Exception as e:
-            print(f"❌ {symbol} lỗi: {e}")
-        time.sleep(0.1)
-
-    if results:
-        message = "📊 Tổng hợp tín hiệu Spoiler Signals:\n\n"
-        for s, sig, t, entry, tp1, tp2, sl, score in results:
-            message += (
-                f"🟢 {s} ➜ {sig} ({t})\n"
-                f"Entry: {entry}\n"
-                f"TP1: {tp1} | TP2: {tp2} | SL: {sl}\n"
-                f"🎯 Score: {score}/10\n\n"
-            )
-        send_telegram_message(message)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     scan_top_100_and_log()
