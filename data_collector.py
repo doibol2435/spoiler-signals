@@ -1,53 +1,68 @@
 import requests
 import pandas as pd
 
-def get_binance_klines(symbol='BTCUSDT', interval='1h', limit=200):
-    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
+BASE_URL = "https://api.bitget.com"
+
+def get_bitget_klines(symbol='BTCUSDT', interval='1H', limit=200):
+    url = f"{BASE_URL}/api/spot/v1/market/candles"
+    params = {
+        "symbol": symbol.lower(),
+        "period": interval,
+        "limit": str(limit)
+    }
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, params=params, timeout=10)
         data = response.json()
-        if not isinstance(data, list):
-            print(f"❌ Klines trả về lỗi cho {symbol}: {data}")
+        if data.get("code") != "00000":
+            print(f"❌ Bitget trả lỗi: {data}")
             return pd.DataFrame()
-        df = pd.DataFrame(data, columns=[
-            'timestamp', 'open', 'high', 'low', 'close', 'volume',
-            'close_time', 'quote_asset_volume', 'num_trades',
-            'taker_buy_base_volume', 'taker_buy_quote_volume', 'ignore'
-        ])
+
+        df = pd.DataFrame(data["data"], columns=[
+            'timestamp', 'open', 'high', 'low', 'close', 'volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         df.set_index('timestamp', inplace=True)
         df = df.astype(float)
         return df[['open', 'high', 'low', 'close', 'volume']]
     except Exception as e:
-        print(f"❌ Lỗi lấy dữ liệu KLINE cho {symbol}: {e}")
+        print(f"❌ Lỗi gọi Bitget KLINE cho {symbol}: {e}")
         return pd.DataFrame()
 
 def get_top_usdt_symbols(limit=100):
-    url = "https://api.binance.com/api/v3/ticker/24hr"
+    url = f"{BASE_URL}/api/spot/v1/market/tickers"
     try:
         res = requests.get(url, timeout=10)
-        all_tickers = res.json()
-
-        if not isinstance(all_tickers, list):
-            print("❌ Binance API trả về dữ liệu không hợp lệ:", all_tickers)
+        data = res.json()
+        if data.get("code") != "00000":
+            print(f"❌ Bitget trả lỗi ticker: {data}")
             return []
-
-        usdt_pairs = [
-            t for t in all_tickers
-            if isinstance(t, dict)
-            and t.get("symbol", "").endswith("USDT")
-            and not t.get("symbol", "").endswith("BUSD")
-        ]
-
-        usdt_pairs = sorted(usdt_pairs, key=lambda x: float(x.get("quoteVolume", 0)), reverse=True)
-        symbols = [item["symbol"] for item in usdt_pairs[:limit]]
+        tickers = data.get("data", [])
+        filtered = [t for t in tickers if t["symbol"].endswith("usdt")]
+        sorted_pairs = sorted(filtered, key=lambda x: float(x["quoteVol"]), reverse=True)
+        symbols = [t["symbol"].upper() for t in sorted_pairs[:limit]]
         return symbols
     except Exception as e:
-        print(f"❌ Lỗi lấy danh sách symbol: {e}")
+        print(f"❌ Lỗi lấy danh sách coin từ Bitget: {e}")
         return []
 
 def get_recent_closes(symbol='BTCUSDT', limit=30):
-    df = get_binance_klines(symbol=symbol, interval='1h', limit=limit)
+    df = get_bitget_klines(symbol=symbol, interval='1H', limit=limit)
     if df.empty:
         return []
     return df['close'].tolist()
+
+def get_price_change(symbol):
+    url = f"{BASE_URL}/api/spot/v1/market/tickers"
+    try:
+        res = requests.get(url, timeout=10)
+        data = res.json()
+        if data.get("code") != "00000":
+            return 0
+        for item in data["data"]:
+            if item["symbol"].upper() == symbol.upper():
+                return float(item["change"])
+    except:
+        return 0
+    return 0
+
+# Gắn hàm chính với tên tương thích Binance
+get_binance_klines = get_bitget_klines

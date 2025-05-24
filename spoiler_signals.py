@@ -65,5 +65,5 @@ def calculate_signal_score(df):
     if latest['volume'] > df['volume'].rolling(20).mean().iloc[-1] * 1.5: score += 2
     if latest['close'] > df['close'].ewm(span=50).mean().iloc[-1]: score += 2  # EMA trend
     if 'rsi' in df.columns and 40 < latest['rsi'] < 70: score += 1
-    if abs(latest['close'] - latest['open']) > (latest['high'] - latest['low']) * 0.6: score += 1  # thân nến mạnh
+    if abs(latest['close'] - latest['open']) > (latest['high'] - latest['low']) * 0.6: score += 1
     return score

@@ -1,12 +1,36 @@
 services:
   - type: web
-    name: spoiler-signals
+    name: spoiler-signals-web
     env: python
+    plan: free
     buildCommand: ""
     startCommand: python app.py
-    autoDeploy: true
     envVars:
       - key: BOT_TOKEN
-        value: <token_telegram>
+        value: 8142201280:AAH9KCcOZXH5XvlvPOPKmvPMy9pKmgPqAFs
       - key: CHAT_ID
-        value: <chat_id>
+        value: -1002605021077
+
+  - type: worker
+    name: spoiler-signals-scan
+    env: python
+    plan: free
+    buildCommand: ""
+    startCommand: python scan_all.py
+    envVars:
+      - key: BOT_TOKEN
+        value: 8142201280:AAH9KCcOZXH5XvlvPOPKmvPMy9pKmgPqAFs
+      - key: CHAT_ID
+        value: -1002605021077
+
+  - type: worker
+    name: spoiler-signals-check-tp
+    env: python
+    plan: free
+    buildCommand: ""
+    startCommand: python check_targets.py
+    envVars:
+      - key: BOT_TOKEN
+        value: 8142201280:AAH9KCcOZXH5XvlvPOPKmvPMy9pKmgPqAFs
+      - key: CHAT_ID
+        value: -1002605021077
