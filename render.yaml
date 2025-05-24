@@ -16,7 +16,7 @@ services:
     env: python
     plan: free
     buildCommand: ""
-    startCommand: python scan_all.py
+    startCommand: python auto_run.py
     envVars:
       - key: BOT_TOKEN
         value: 8142201280:AAH9KCcOZXH5XvlvPOPKmvPMy9pKmgPqAFs
@@ -28,7 +28,7 @@ services:
     env: python
     plan: free
     buildCommand: ""
-    startCommand: python check_targets.py
+    startCommand: python auto_check.py
     envVars:
       - key: BOT_TOKEN
         value: 8142201280:AAH9KCcOZXH5XvlvPOPKmvPMy9pKmgPqAFs
