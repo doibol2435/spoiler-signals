@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: spoiler-signals
+    env: python
+    buildCommand: ""
+    startCommand: python app.py
+    autoDeploy: true
+    envVars:
+      - key: BOT_TOKEN
+        value: <token_telegram>
+      - key: CHAT_ID
+        value: <chat_id>

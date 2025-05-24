@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>All Signals</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body class="container mt-4">
+    <h1 class="mb-4">📜 Tín hiệu gần đây</h1>
+
+    <button class="btn btn-danger mb-3" onclick="deleteLog()">🗑 Xóa log</button>
+
+    <select id="filter" class="form-select mb-3" style="width:200px">
+        <option value="">-- Tất cả tín hiệu --</option>
+        <option value="Long">Long</option>
+        <option value="Short">Short</option>
+        <option value="Buy Breakout">Buy Breakout</option>
+        <option value="Sell Breakout">Sell Breakout</option>
+        <option value="False Long">False Long</option>
+        <option value="False Short">False Short</option>
+    </select>
+
+    <table class="table table-striped" id="signal-table">
+        <thead>
+            <tr>
+                <th>#</th><th>Coin</th><th>Tín hiệu</th><th>Thời gian</th><th>% 24h</th>
+                <th>Entry</th><th>TP1</th><th>TP2</th><th>SL</th><th>Spark</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <h4>📌 Trạng thái TP/SL</h4>
+    <table class="table table-bordered" id="pnl-table">
+        <thead><tr><th>#</th><th>Coin</th><th>Thời gian</th><th>Kết quả</th><th>Giá</th></tr></thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        function loadSignals() {
+            let selected = $("#filter").val();
+            $.getJSON("/api/all_signals", function(data) {
+                let html = "";
+                data.forEach((item, index) => {
+                    if (selected && item.signal !== selected) return;
+                    html += `<tr>
+                        <td>${index + 1}</td>
+                        <td><b>${item.symbol}</b></td>
+                        <td>${item.signal}</td>
+                        <td>${item.time}</td>
+                        <td>${item.change}%</td>
+                        <td>${item.entry}</td>
+                        <td>${item.tp1}</td>
+                        <td>${item.tp2}</td>
+                        <td>${item.sl}</td>
+                        <td><canvas id="spark_${item.symbol}" width="100" height="40"></canvas></td>
+                    </tr>`;
+                });
+                $("#signal-table tbody").html(html);
+
+                data.forEach((item) => {
+                    $.getJSON(`/api/sparkline/${item.symbol}`, function(prices) {
+                        const ctx = document.getElementById(`spark_${item.symbol}`);
+                        if (!ctx) return;
+                        new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: prices.map((_, i) => i),
+                                datasets: [{
+                                    data: prices,
+                                    borderColor: "blue",
+                                    borderWidth: 1,
+                                    pointRadius: 0,
+                                    fill: false
+                                }]
+                            },
+                            options: {
+                                scales: { x: { display: false }, y: { display: false } },
+                                plugins: { legend: { display: false } },
+                                elements: { line: { tension: 0.3 } },
+                                animation: false
+                            }
+                        });
+                    });
+                });
+            });
+        }
+
+        function loadPnl() {
+            $.getJSON("/api/pnl_status", function(data) {
+                let html = "";
+                data.forEach((item, i) => {
+                    html += `<tr>
+                        <td>${i + 1}</td>
+                        <td>${item.symbol}</td>
+                        <td>${item.time}</td>
+                        <td>${item.result}</td>
+                        <td>${item.price}</td>
+                    </tr>`;
+                });
+                $("#pnl-table tbody").html(html);
+            });
+        }
+
+        function deleteLog() {
+            if (confirm("Bạn có chắc chắn muốn xóa toàn bộ log?")) {
+                $.post("/delete_log", function(data) {
+                    if (data.success) {
+                        alert("Đã xóa log!");
+                        loadSignals();
+                        loadPnl();
+                    }
+                });
+            }
+        }
+
+        $("#filter").change(loadSignals);
+        loadSignals();
+        loadPnl();
+        setInterval(() => { loadSignals(); loadPnl(); }, 60000);
+    </script>
+</body>
+</html>

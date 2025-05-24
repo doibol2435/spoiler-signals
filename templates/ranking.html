@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ranking - Spoiler Signals</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body class="container mt-4">
+    <h1 class="mb-4">📈 Ranking Dashboard</h1>
+
+    <h4>🔍 Gợi ý Coin Sắp Breakout</h4>
+    <label>Lọc theo biến động % &gt;= </label>
+    <input id="percentFilter" type="number" value="0" style="width:80px" />%
+    <button class="btn btn-sm btn-primary" onclick="loadRanking()">Lọc</button>
+
+    <table class="table table-bordered mt-3" id="breakout-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Coin</th>
+                <th>% 24h</th>
+                <th>Osc</th>
+                <th>Thời gian</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <h4 class="mt-5">🔥 Top 10 Coin Tăng Mạnh Nhất 24h</h4>
+    <table class="table table-striped" id="gainers-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Coin</th>
+                <th>% 24h</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        function loadRanking() {
+            let minChange = parseFloat($("#percentFilter").val());
+            $.getJSON("/api/ranking_data", function(data) {
+                let breakoutHtml = "";
+                data.breakouts.forEach((item, i) => {
+                    if (item.change >= minChange) {
+                        breakoutHtml += `<tr>
+                            <td>${i + 1}</td>
+                            <td><b>${item.symbol}</b></td>
+                            <td>${item.change}%</td>
+                            <td>${item.osc}</td>
+                            <td>${item.time}</td>
+                        </tr>`;
+                    }
+                });
+                $("#breakout-table tbody").html(breakoutHtml);
+
+                let gainersHtml = "";
+                data.gainers.forEach((item, i) => {
+                    gainersHtml += `<tr>
+                        <td>${i + 1}</td>
+                        <td><b>${item.symbol}</b></td>
+                        <td class="text-success fw-bold">+${item.change}%</td>
+                    </tr>`;
+                });
+                $("#gainers-table tbody").html(gainersHtml);
+            });
+        }
+
+        loadRanking();
+        setInterval(loadRanking, 60000);
+    </script>
+</body>
+</html>
