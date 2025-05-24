@@ -19,6 +19,7 @@ def is_cache_expired():
 
 def update_symbol_map():
     global symbol_to_id
+
     if not is_cache_expired():
         with open(CACHE_FILE, "r", encoding="utf-8") as f:
             symbol_to_id = json.load(f)
@@ -26,14 +27,32 @@ def update_symbol_map():
             return
 
     try:
-        res = requests.get(f"{COINGECKO_BASE}/coins/list")
-        coins = res.json()
-        for coin in coins:
-            symbol = coin['symbol'].upper() + 'USDT'
-            symbol_to_id[symbol] = coin['id']
+        symbol_to_id.clear()
+        all_coins = []
+        for page in range(1, 5):  # 100 coins mỗi trang x 4 = 400 coin
+            url = f"{COINGECKO_BASE}/coins/markets"
+            params = {
+                "vs_currency": "usd",
+                "order": "market_cap_desc",
+                "per_page": 100,
+                "page": page,
+                "sparkline": False
+            }
+            res = requests.get(url, params=params)
+            coins = res.json()
+            all_coins.extend(coins)
+            time.sleep(1)  # tránh giới hạn rate
+
+        for coin in all_coins:
+            symbol = coin['symbol'].upper() + "USDT"
+            coin_id = coin['id']
+            symbol_to_id[symbol] = coin_id
+
         with open(CACHE_FILE, "w", encoding="utf-8") as f:
             json.dump(symbol_to_id, f)
-        print(f"✅ Đã cập nhật {len(symbol_to_id)} symbol → id từ Coingecko")
+
+        print(f"✅ Đã cập nhật {len(symbol_to_id)} symbol → id từ TOP 400 coin Coingecko")
+
     except Exception as e:
         print(f"❌ Lỗi cập nhật symbol map: {e}")
 
