@@ -91,4 +91,4 @@ def run_every(minutes=5):
 
 
 if __name__ == "__main__":
-    run_every(5)
+    run_every(1)
